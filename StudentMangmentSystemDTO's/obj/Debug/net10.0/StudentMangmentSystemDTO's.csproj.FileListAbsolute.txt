@@ -1,0 +1,11 @@
+D:\MyProjects\MW_Final\StudentMangmentSystem\StudentMangmentSystemDTO's\bin\Debug\net10.0\StudentMangmentSystemDTO's.deps.json
+D:\MyProjects\MW_Final\StudentMangmentSystem\StudentMangmentSystemDTO's\bin\Debug\net10.0\StudentMangmentSystemDTO's.dll
+D:\MyProjects\MW_Final\StudentMangmentSystem\StudentMangmentSystemDTO's\bin\Debug\net10.0\StudentMangmentSystemDTO's.pdb
+D:\MyProjects\MW_Final\StudentMangmentSystem\StudentMangmentSystemDTO's\obj\Debug\net10.0\StudentMangmentSystemDTO's.GeneratedMSBuildEditorConfig.editorconfig
+D:\MyProjects\MW_Final\StudentMangmentSystem\StudentMangmentSystemDTO's\obj\Debug\net10.0\StudentMangmentSystemDTO's.AssemblyInfoInputs.cache
+D:\MyProjects\MW_Final\StudentMangmentSystem\StudentMangmentSystemDTO's\obj\Debug\net10.0\StudentMangmentSystemDTO's.AssemblyInfo.cs
+D:\MyProjects\MW_Final\StudentMangmentSystem\StudentMangmentSystemDTO's\obj\Debug\net10.0\StudentMangmentSystemDTO's.csproj.CoreCompileInputs.cache
+D:\MyProjects\MW_Final\StudentMangmentSystem\StudentMangmentSystemDTO's\obj\Debug\net10.0\StudentMangmentSystemDTO's.dll
+D:\MyProjects\MW_Final\StudentMangmentSystem\StudentMangmentSystemDTO's\obj\Debug\net10.0\refint\StudentMangmentSystemDTO's.dll
+D:\MyProjects\MW_Final\StudentMangmentSystem\StudentMangmentSystemDTO's\obj\Debug\net10.0\StudentMangmentSystemDTO's.pdb
+D:\MyProjects\MW_Final\StudentMangmentSystem\StudentMangmentSystemDTO's\obj\Debug\net10.0\ref\StudentMangmentSystemDTO's.dll
