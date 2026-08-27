@@ -116,7 +116,22 @@ namespace StudentManagementSystem.API.Services.Auth
                 .Include(rt => rt.User)
                 .FirstOrDefaultAsync(rt => rt.Token == HashToken(refreshToken));
 
-            if (stored == null || stored.IsRevoked || stored.ExpiresAt <= DateTime.UtcNow) return null;
+            if (stored == null || stored.User == null) return null;
+
+            // Reuse detection: presenting an already-revoked token means it may have been
+            // stolen, so revoke the whole family and force re-authentication.
+            if (stored.IsRevoked)
+            {
+                await RevokeAllUserTokensAsync(stored.UserId);
+                return null;
+            }
+
+            if (stored.ExpiresAt <= DateTime.UtcNow)
+            {
+                _db.RefreshTokens.Remove(stored);
+                await _db.SaveChangesAsync();
+                return null;
+            }
 
             stored.IsRevoked = true;
             await _db.SaveChangesAsync();
@@ -129,6 +144,8 @@ namespace StudentManagementSystem.API.Services.Auth
 
         private async Task<AuthResponseDto> GenerateTokensAsync(AppUser user, string role)
         {
+            await PurgeExpiredTokensAsync(user.Id);
+
             var accessToken = GenerateAccessToken(user, role);
             var refreshTokenValue = GenerateRefreshTokenValue();
 
@@ -196,6 +213,28 @@ namespace StudentManagementSystem.API.Services.Auth
             if (role.Equals(DbSeeder.RoleStudent, StringComparison.OrdinalIgnoreCase)) return DbSeeder.RoleStudent;
             if (role.Equals(DbSeeder.RoleTeacher, StringComparison.OrdinalIgnoreCase)) return DbSeeder.RoleTeacher;
             return null;
+        }
+
+        private async Task PurgeExpiredTokensAsync(string userId)
+        {
+            var cutoff = DateTime.UtcNow.AddDays(-_jwtOptions.RefreshTokenDurationInDays * 2);
+            var stale = await _db.RefreshTokens
+                .Where(rt => rt.UserId == userId &&
+                             (rt.ExpiresAt <= DateTime.UtcNow || (rt.IsRevoked && rt.CreatedAt <= cutoff)))
+                .ToListAsync();
+
+            if (stale.Count == 0) return;
+
+            _db.RefreshTokens.RemoveRange(stale);
+            await _db.SaveChangesAsync();
+        }
+
+        private async Task RevokeAllUserTokensAsync(string userId)
+        {
+            var tokens = await _db.RefreshTokens.Where(rt => rt.UserId == userId && !rt.IsRevoked).ToListAsync();
+            foreach (var token in tokens)
+                token.IsRevoked = true;
+            await _db.SaveChangesAsync();
         }
     }
 }

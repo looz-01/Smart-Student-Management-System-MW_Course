@@ -19,7 +19,7 @@ namespace StudentManagementSystem.API.Controllers
             _gradeService = gradeService;
         }
 
-        [HttpGet]
+[HttpGet]
         [Authorize(Roles = "Admin,Teacher")]
         public async Task<ActionResult<ResponseApi<PagedResult<GradeReadDto>>>> GetAll(
             [FromQuery] int pageNumber = 1,
@@ -28,7 +28,10 @@ namespace StudentManagementSystem.API.Controllers
             [FromQuery] int? courseId = null)
         {
             var request = new PageRequest { PageNumber = pageNumber, PageSize = pageSize };
-            var result = await _gradeService.GetAllAsync(request, studentId, courseId);
+            var teacherUserId = User.IsInRole("Teacher")
+                ? User.FindFirstValue(ClaimTypes.NameIdentifier)
+                : null;
+            var result = await _gradeService.GetAllAsync(request, studentId, courseId, teacherUserId);
             return Ok(ResponseApi<PagedResult<GradeReadDto>>.Ok(result, "Grades Retrieved Successfully."));
         }
 
@@ -51,11 +54,24 @@ namespace StudentManagementSystem.API.Controllers
             return Ok(ResponseApi<PagedResult<GradeReadDto>>.Ok(result, "Grades Retrieved Successfully."));
         }
 
-        [HttpGet("{id:int}")]
+[HttpGet("{id:int}")]
         [Authorize(Roles = "Admin,Teacher")]
         public async Task<ActionResult<ResponseApi<GradeReadDto>>> GetGrade(int id)
         {
-            var grade = await _gradeService.GetByIdAsync(id);
+            var teacherUserId = User.IsInRole("Teacher")
+                ? User.FindFirstValue(ClaimTypes.NameIdentifier)
+                : null;
+
+            GradeReadDto? grade;
+            try
+            {
+                grade = await _gradeService.GetByIdAsync(id, teacherUserId);
+            }
+            catch (AppException ex)
+            {
+                return BadRequest(ResponseApi<GradeReadDto>.BadRequest(ex.Message));
+            }
+
             if (grade == null)
                 return NotFound(ResponseApi<object>.NotFound($"There's no Grade with ID : {id}"));
 

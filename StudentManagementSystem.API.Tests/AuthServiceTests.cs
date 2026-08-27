@@ -122,7 +122,7 @@ public class AuthServiceTests : IDisposable
         Assert.Null(result);
     }
 
-    [Fact]
+[Fact]
     public async Task Refresh_ValidToken_RotatesToken()
     {
         var auth = _provider.GetService<IAuthService>();
@@ -140,6 +140,28 @@ public class AuthServiceTests : IDisposable
         // Old refresh token must now be revoked.
         var replay = await auth.RefreshAsync(login.RefreshToken);
         Assert.Null(replay);
+    }
+
+    [Fact]
+    public async Task Refresh_ReplayedToken_RevokesWholeFamily()
+    {
+        var auth = _provider.GetService<IAuthService>();
+        await _provider.CreateUserAsync("family@test.com", "Test12345", "Student");
+
+        var login = await auth.LoginAsync(new LoginDto { Email = "family@test.com", Password = "Test12345" });
+        Assert.NotNull(login);
+
+        var firstRefresh = await auth.RefreshAsync(login.RefreshToken);
+        Assert.NotNull(firstRefresh);
+
+        // Replaying the OLD (already revoked) token must be treated as token theft
+        // and revoke every outstanding token of the user.
+        var replay = await auth.RefreshAsync(login.RefreshToken);
+        Assert.Null(replay);
+
+        // The token issued by the previous refresh must no longer work either.
+        var secondRefresh = await auth.RefreshAsync(firstRefresh.RefreshToken);
+        Assert.Null(secondRefresh);
     }
 
     public void Dispose() => _provider.Dispose();

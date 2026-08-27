@@ -19,7 +19,7 @@ namespace StudentManagementSystem.API.Services.Attendance
             _mapper = mapper;
         }
 
-        public async Task<PagedResult<AttendanceReadDto>> GetAllAsync(PageRequest request, int? studentId = null, int? courseId = null)
+        public async Task<PagedResult<AttendanceReadDto>> GetAllAsync(PageRequest request, int? studentId = null, int? courseId = null, string? teacherUserId = null)
         {
             request.Normalize();
 
@@ -30,6 +30,12 @@ namespace StudentManagementSystem.API.Services.Attendance
 
             if (courseId.HasValue)
                 query = query.Where(a => a.CourseId == courseId.Value);
+
+            if (!string.IsNullOrEmpty(teacherUserId))
+            {
+                var teacherCourseIds = GetTeacherCourseIds(teacherUserId);
+                query = query.Where(a => teacherCourseIds.Contains(a.CourseId));
+            }
 
             var totalCount = await query.CountAsync();
 
@@ -42,10 +48,16 @@ namespace StudentManagementSystem.API.Services.Attendance
             return PagedResultFactory.Create(_mapper.Map<List<AttendanceReadDto>>(attendances), totalCount, request);
         }
 
-        public async Task<AttendanceReadDto?> GetByIdAsync(int id)
+        public async Task<AttendanceReadDto?> GetByIdAsync(int id, string? teacherUserId = null)
         {
             var attendance = await _db.Attendances.FirstOrDefaultAsync(a => a.Id == id);
-            return attendance == null ? null : _mapper.Map<AttendanceReadDto>(attendance);
+            if (attendance == null) return null;
+
+            if (!string.IsNullOrEmpty(teacherUserId) &&
+                !GetTeacherCourseIds(teacherUserId).Contains(attendance.CourseId))
+                throw new AppException("You can only view attendance for courses you teach.");
+
+            return _mapper.Map<AttendanceReadDto>(attendance);
         }
 
         public async Task<PagedResult<AttendanceReadDto>> GetByStudentIdAsync(int studentId, PageRequest request)
@@ -84,14 +96,18 @@ namespace StudentManagementSystem.API.Services.Attendance
             if (!isEnrolled)
                 throw new AppException("Student is not enrolled in this course.");
 
+            // Normalize to a date-only value so the unique index matches a single day.
+            var date = DateTime.SpecifyKind(dto.Date.Date, DateTimeKind.Utc);
+
             var alreadyMarked = await _db.Attendances
                 .AnyAsync(a => a.StudentId == dto.StudentId &&
                                a.CourseId == dto.CourseId &&
-                               a.Date.Date == dto.Date.Date);
+                               a.Date == date);
             if (alreadyMarked)
                 throw new AppException("Attendance is already marked for this student on this day.");
 
             var attendance = _mapper.Map<Models.Attendance>(dto);
+            attendance.Date = date;
             await _db.Attendances.AddAsync(attendance);
             await _db.SaveChangesAsync();
             return _mapper.Map<AttendanceReadDto>(attendance);
@@ -138,6 +154,14 @@ namespace StudentManagementSystem.API.Services.Attendance
                 if (!courseExists)
                     throw new AppException("Course not found.");
             }
+        }
+
+        private IQueryable<int> GetTeacherCourseIds(string teacherUserId)
+        {
+            return from c in _db.Courses.AsNoTracking()
+                   join t in _db.Teachers.AsNoTracking() on c.TeacherId equals t.Id
+                   where t.UserId == teacherUserId
+                   select c.Id;
         }
     }
 }

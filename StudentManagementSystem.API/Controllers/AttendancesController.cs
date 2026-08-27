@@ -19,7 +19,7 @@ namespace StudentManagementSystem.API.Controllers
             _attendanceService = attendanceService;
         }
 
-        [HttpGet]
+[HttpGet]
         [Authorize(Roles = "Admin,Teacher")]
         public async Task<ActionResult<ResponseApi<PagedResult<AttendanceReadDto>>>> GetAll(
             [FromQuery] int pageNumber = 1,
@@ -28,7 +28,10 @@ namespace StudentManagementSystem.API.Controllers
             [FromQuery] int? courseId = null)
         {
             var request = new PageRequest { PageNumber = pageNumber, PageSize = pageSize };
-            var result = await _attendanceService.GetAllAsync(request, studentId, courseId);
+            var teacherUserId = User.IsInRole("Teacher")
+                ? User.FindFirstValue(ClaimTypes.NameIdentifier)
+                : null;
+            var result = await _attendanceService.GetAllAsync(request, studentId, courseId, teacherUserId);
             return Ok(ResponseApi<PagedResult<AttendanceReadDto>>.Ok(result, "Attendances Retrieved Successfully."));
         }
 
@@ -51,11 +54,24 @@ namespace StudentManagementSystem.API.Controllers
             return Ok(ResponseApi<PagedResult<AttendanceReadDto>>.Ok(result, "Attendance Retrieved Successfully."));
         }
 
-        [HttpGet("{id:int}")]
+[HttpGet("{id:int}")]
         [Authorize(Roles = "Admin,Teacher")]
         public async Task<ActionResult<ResponseApi<AttendanceReadDto>>> GetAttendance(int id)
         {
-            var attendance = await _attendanceService.GetByIdAsync(id);
+            var teacherUserId = User.IsInRole("Teacher")
+                ? User.FindFirstValue(ClaimTypes.NameIdentifier)
+                : null;
+
+            AttendanceReadDto? attendance;
+            try
+            {
+                attendance = await _attendanceService.GetByIdAsync(id, teacherUserId);
+            }
+            catch (AppException ex)
+            {
+                return BadRequest(ResponseApi<AttendanceReadDto>.BadRequest(ex.Message));
+            }
+
             if (attendance == null)
                 return NotFound(ResponseApi<object>.NotFound($"There's no Attendance with ID : {id}"));
 

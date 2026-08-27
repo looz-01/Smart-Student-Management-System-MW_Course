@@ -70,6 +70,14 @@ namespace StudentManagementSystem.API.Services.Teacher
             if (!isTeacherRole)
                 throw new AppException("The linked user is not registered as a Teacher.");
 
+            var alreadyLinked = await _db.Teachers.AnyAsync(t => t.UserId == dto.UserId);
+            if (alreadyLinked)
+                throw new AppException("A teacher profile is already linked to this user.");
+
+            var duplicate = await _db.Teachers.AnyAsync(x => x.Name.ToLower() == dto.Name.ToLower());
+            if (duplicate)
+                throw new AppException("A teacher with this name already exists.");
+
             var teacher = _mapper.Map<Models.Teacher>(dto);
             await _db.Teachers.AddAsync(teacher);
             await _db.SaveChangesAsync();

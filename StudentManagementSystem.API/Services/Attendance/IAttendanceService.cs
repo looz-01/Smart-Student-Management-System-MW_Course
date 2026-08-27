@@ -5,8 +5,8 @@ namespace StudentManagementSystem.API.Services.Attendance
 {
     public interface IAttendanceService
     {
-        Task<PagedResult<AttendanceReadDto>> GetAllAsync(PageRequest request, int? studentId = null, int? courseId = null);
-        Task<AttendanceReadDto?> GetByIdAsync(int id);
+        Task<PagedResult<AttendanceReadDto>> GetAllAsync(PageRequest request, int? studentId = null, int? courseId = null, string? teacherUserId = null);
+        Task<AttendanceReadDto?> GetByIdAsync(int id, string? teacherUserId = null);
         Task<PagedResult<AttendanceReadDto>> GetByStudentIdAsync(int studentId, PageRequest request);
         Task<int?> GetStudentIdByUserIdAsync(string userId);
         Task<AttendanceReadDto> CreateAsync(AttendanceCreateDto dto, string? teacherUserId = null);

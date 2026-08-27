@@ -74,6 +74,14 @@ namespace StudentManagementSystem.API.Services.Student
             if (!isStudentRole)
                 throw new AppException("The linked user is not registered as a Student.");
 
+            var alreadyLinked = await _db.Students.AnyAsync(s => s.UserId == dto.UserId);
+            if (alreadyLinked)
+                throw new AppException("A student profile is already linked to this user.");
+
+            var duplicate = await _db.Students.AnyAsync(x => x.Name.ToLower() == dto.Name.ToLower());
+            if (duplicate)
+                throw new AppException("A student with this name already exists.");
+
             var student = _mapper.Map<Models.Student>(dto);
             await _db.Students.AddAsync(student);
             await _db.SaveChangesAsync();

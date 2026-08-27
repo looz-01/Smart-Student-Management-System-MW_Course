@@ -64,7 +64,7 @@ public class AdminServiceTests : IDisposable
         Assert.False(await _provider.Db.Teachers.AnyAsync(t => t.UserId == user.Id));
     }
 
-    [Fact]
+[Fact]
     public async Task ChangeRole_UnknownRole_ReturnsFalse()
     {
         var adminService = _provider.GetService<IAdminService>();
@@ -85,5 +85,49 @@ public class AdminServiceTests : IDisposable
         Assert.False(changed);
     }
 
-    public void Dispose() => _provider.Dispose();
+    [Fact]
+    public async Task ChangeRole_LastAdmin_IsBlocked()
+    {
+        var adminService = _provider.GetService<IAdminService>();
+        var admin = await _provider.CreateUserAsync("last-admin@test.com", "Test12345", "Admin");
+
+        var changed = await adminService.ChangeRoleAsync(new ChangeRoleDto { UserId = admin.Id, NewRole = "Student" });
+
+        Assert.False(changed);
+        Assert.True(await _provider.UserManager.IsInRoleAsync(admin, "Admin"));
+    }
+
+    [Fact]
+    public async Task ChangeRole_RemovesOldProfileAndItsData()
+    {
+        var adminService = _provider.GetService<IAdminService>();
+        var teacherUser = await _provider.CreateUserAsync("old-teacher@test.com", "Test12345", "Teacher");
+
+        var teacher = new Models.Teacher { Name = "Old Teacher", UserId = teacherUser.Id, Age = 30 };
+        _provider.Db.Teachers.Add(teacher);
+        await _provider.Db.SaveChangesAsync();
+
+        var course = new Models.Course { Name = "Legacy Course", Hours = 3, TeacherId = teacher.Id };
+        _provider.Db.Courses.Add(course);
+        await _provider.Db.SaveChangesAsync();
+
+        var studentUser = await _provider.CreateUserAsync("old-student@test.com", "Test12345", "Student");
+        var student = new Models.Student { Name = "Old Student", UserId = studentUser.Id, Age = 18, Gender = "M" };
+        _provider.Db.Students.Add(student);
+        await _provider.Db.SaveChangesAsync();
+
+        _provider.Db.Enrollments.Add(new Models.Enrollment { StudentId = student.Id, CourseId = course.Id });
+        await _provider.Db.SaveChangesAsync();
+
+        var changed = await adminService.ChangeRoleAsync(new ChangeRoleDto { UserId = teacherUser.Id, NewRole = "Student" });
+
+        Assert.True(changed);
+        Assert.True(await _provider.UserManager.IsInRoleAsync(teacherUser, "Student"));
+        Assert.False(await _provider.Db.Teachers.AnyAsync(t => t.UserId == teacherUser.Id));
+        Assert.False(await _provider.Db.Courses.AnyAsync(c => c.Id == course.Id));
+        Assert.False(await _provider.Db.Enrollments.AnyAsync(e => e.StudentId == student.Id));
+        Assert.True(await _provider.Db.Students.AnyAsync(s => s.UserId == teacherUser.Id));
+    }
+
+public void Dispose() => _provider.Dispose();
 }

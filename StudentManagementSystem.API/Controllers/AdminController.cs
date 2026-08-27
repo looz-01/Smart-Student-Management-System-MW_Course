@@ -45,7 +45,8 @@ namespace StudentManagementSystem.API.Controllers
                 return BadRequest(ResponseApi<object>.BadRequest("Please Enter Valid Data"));
 
             var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (dto.UserId == currentUserId && dto.NewRole != "Admin")
+            if (dto.UserId == currentUserId &&
+                !dto.NewRole.Equals("Admin", StringComparison.OrdinalIgnoreCase))
                 return BadRequest(ResponseApi<object>.BadRequest("You cannot remove your own Admin role."));
 
             var result = await _adminService.ChangeRoleAsync(dto);

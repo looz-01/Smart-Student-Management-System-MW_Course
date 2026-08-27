@@ -35,8 +35,10 @@ namespace StudentManagementSystem.API.Middleware
                 var (statusCode, message) = ex switch
                 {
                     AppException appEx => (appEx.StatusCode, appEx.Message),
-                    DbUpdateException when ex.InnerException?.Message.Contains("FOREIGN KEY", StringComparison.OrdinalIgnoreCase) == true
+                    DbUpdateException dbe when IsForeignKeyViolation(dbe)
                         => ((int)HttpStatusCode.Conflict, "Cannot delete: the record is referenced by other data."),
+                    DbUpdateException dbe when IsUniqueViolation(dbe)
+                        => ((int)HttpStatusCode.Conflict, "A record with the same unique values already exists."),
                     DbUpdateException => ((int)HttpStatusCode.Conflict, "A data conflict occurred while saving changes."),
                     _ => ((int)HttpStatusCode.InternalServerError, "An unexpected error occurred.")
                 };
@@ -64,6 +66,23 @@ namespace StudentManagementSystem.API.Middleware
                     PropertyNamingPolicy = JsonNamingPolicy.CamelCase
                 }));
             }
+        }
+
+        private static bool IsForeignKeyViolation(DbUpdateException ex)
+        {
+            var message = ex.InnerException?.Message;
+            return !string.IsNullOrEmpty(message) &&
+                   (message.Contains("FOREIGN KEY", StringComparison.OrdinalIgnoreCase) ||
+                    message.Contains("REFERENCE constraint", StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static bool IsUniqueViolation(DbUpdateException ex)
+        {
+            var message = ex.InnerException?.Message;
+            return !string.IsNullOrEmpty(message) &&
+                   (message.Contains("unique index", StringComparison.OrdinalIgnoreCase) ||
+                    message.Contains("unique constraint", StringComparison.OrdinalIgnoreCase) ||
+                    message.Contains("duplicate key", StringComparison.OrdinalIgnoreCase));
         }
     }
 }

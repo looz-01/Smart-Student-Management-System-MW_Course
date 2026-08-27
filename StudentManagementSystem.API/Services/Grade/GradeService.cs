@@ -19,7 +19,7 @@ namespace StudentManagementSystem.API.Services.Grade
             _mapper = mapper;
         }
 
-        public async Task<PagedResult<GradeReadDto>> GetAllAsync(PageRequest request, int? studentId = null, int? courseId = null)
+        public async Task<PagedResult<GradeReadDto>> GetAllAsync(PageRequest request, int? studentId = null, int? courseId = null, string? teacherUserId = null)
         {
             request.Normalize();
 
@@ -30,6 +30,12 @@ namespace StudentManagementSystem.API.Services.Grade
 
             if (courseId.HasValue)
                 query = query.Where(g => g.CourseId == courseId.Value);
+
+            if (!string.IsNullOrEmpty(teacherUserId))
+            {
+                var teacherCourseIds = GetTeacherCourseIds(teacherUserId);
+                query = query.Where(g => teacherCourseIds.Contains(g.CourseId));
+            }
 
             var totalCount = await query.CountAsync();
 
@@ -42,10 +48,16 @@ namespace StudentManagementSystem.API.Services.Grade
             return PagedResultFactory.Create(_mapper.Map<List<GradeReadDto>>(grades), totalCount, request);
         }
 
-        public async Task<GradeReadDto?> GetByIdAsync(int id)
+        public async Task<GradeReadDto?> GetByIdAsync(int id, string? teacherUserId = null)
         {
             var grade = await _db.Grades.FirstOrDefaultAsync(g => g.Id == id);
-            return grade == null ? null : _mapper.Map<GradeReadDto>(grade);
+            if (grade == null) return null;
+
+            if (!string.IsNullOrEmpty(teacherUserId) &&
+                !GetTeacherCourseIds(teacherUserId).Contains(grade.CourseId))
+                throw new AppException("You can only view grades for courses you teach.");
+
+            return _mapper.Map<GradeReadDto>(grade);
         }
 
         public async Task<PagedResult<GradeReadDto>> GetByStudentIdAsync(int studentId, PageRequest request)
@@ -86,6 +98,11 @@ namespace StudentManagementSystem.API.Services.Grade
                 .AnyAsync(e => e.StudentId == dto.StudentId && e.CourseId == dto.CourseId);
             if (!isEnrolled)
                 throw new AppException("Student is not enrolled in this course.");
+
+            var gradeExists = await _db.Grades
+                .AnyAsync(g => g.StudentId == dto.StudentId && g.CourseId == dto.CourseId);
+            if (gradeExists)
+                throw new AppException("A grade already exists for this student in this course.");
 
             var grade = _mapper.Map<Models.Grade>(dto);
             grade.CreatedDate = DateTime.UtcNow;
@@ -138,6 +155,14 @@ namespace StudentManagementSystem.API.Services.Grade
                 if (!courseExists)
                     throw new AppException("Course not found.");
             }
+        }
+
+        private IQueryable<int> GetTeacherCourseIds(string teacherUserId)
+        {
+            return from c in _db.Courses.AsNoTracking()
+                   join t in _db.Teachers.AsNoTracking() on c.TeacherId equals t.Id
+                   where t.UserId == teacherUserId
+                   select c.Id;
         }
     }
 }

@@ -10,7 +10,8 @@ namespace StudentManagementSystem.DTOs.Student
         [Required]
         public string Name { get; set; } = string.Empty;
 
-        [Required]
+[Required]
+        [Range(5, 120, ErrorMessage = "Age must be between 5 and 120.")]
         public int Age { get; set; }
 
         [Required]

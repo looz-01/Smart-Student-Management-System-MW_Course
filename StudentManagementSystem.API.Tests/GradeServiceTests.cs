@@ -80,7 +80,7 @@ await EnrollAsync(studentId, courseId);
         Assert.Equal(77, grade.Score);
     }
 
-    [Fact]
+[Fact]
     public async Task Update_TeacherNotOwningCourse_Throws()
     {
         var gradeService = _provider.GetService<IGradeService>();
@@ -92,6 +92,62 @@ var grade = await gradeService.CreateAsync(new GradeCreateDto { StudentId = stud
 
         var ex = await Assert.ThrowsAsync<AppException>(() =>
             gradeService.UpdateAsync(grade.Id, new GradeUpdateDto { Score = 99 }, otherTeacher.Id));
+
+        Assert.Contains("courses you teach", ex.Message);
+    }
+
+    [Fact]
+    public async Task Create_DuplicateGradeForSameStudentAndCourse_Throws()
+    {
+        var gradeService = _provider.GetService<IGradeService>();
+        var (studentId, courseId) = await SeedStudentAndCourseAsync();
+        await EnrollAsync(studentId, courseId);
+
+        await gradeService.CreateAsync(new GradeCreateDto { StudentId = studentId, CourseId = courseId, Score = 80 });
+
+        var ex = await Assert.ThrowsAsync<AppException>(() =>
+            gradeService.CreateAsync(new GradeCreateDto { StudentId = studentId, CourseId = courseId, Score = 90 }));
+
+        Assert.Contains("already exists", ex.Message);
+    }
+
+    [Fact]
+    public async Task GetAll_TeacherOnlySeesOwnCoursesGrades()
+    {
+        var gradeService = _provider.GetService<IGradeService>();
+        var (studentId, courseId, teacherUserId) = await SeedStudentAndCourseWithTeacherAsync();
+        await EnrollAsync(studentId, courseId);
+
+        var otherTeacher = await SeedTeacherAsync("other3@teacher.com");
+        await SeedTeacherProfileAsync(otherTeacher);
+        var otherCourse = new Models.Course { Name = "History", Hours = 2, TeacherId = (await _provider.Db.Teachers.FirstAsync(t => t.UserId == otherTeacher.Id)).Id };
+        _provider.Db.Courses.Add(otherCourse);
+        await _provider.Db.SaveChangesAsync();
+        _provider.Db.Enrollments.Add(new Models.Enrollment { StudentId = studentId, CourseId = otherCourse.Id });
+        await _provider.Db.SaveChangesAsync();
+
+        await gradeService.CreateAsync(new GradeCreateDto { StudentId = studentId, CourseId = courseId, Score = 70 });
+        await gradeService.CreateAsync(new GradeCreateDto { StudentId = studentId, CourseId = otherCourse.Id, Score = 65 });
+
+        var teacherView = await gradeService.GetAllAsync(new DTOs.Common.PageRequest { PageSize = 50 }, teacherUserId: teacherUserId);
+
+        Assert.Equal(1, teacherView.TotalCount);
+        Assert.Equal(70, teacherView.Items[0].Score);
+    }
+
+    [Fact]
+    public async Task GetById_TeacherAccessingOtherCourseGrade_Throws()
+    {
+        var gradeService = _provider.GetService<IGradeService>();
+        var (studentId, courseId) = await SeedStudentAndCourseAsync();
+        await EnrollAsync(studentId, courseId);
+        var grade = await gradeService.CreateAsync(new GradeCreateDto { StudentId = studentId, CourseId = courseId, Score = 88 });
+
+        var otherTeacher = await SeedTeacherAsync("other4@teacher.com");
+        await SeedTeacherProfileAsync(otherTeacher);
+
+        var ex = await Assert.ThrowsAsync<AppException>(() =>
+            gradeService.GetByIdAsync(grade.Id, otherTeacher.Id));
 
         Assert.Contains("courses you teach", ex.Message);
     }

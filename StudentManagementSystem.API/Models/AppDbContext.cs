@@ -51,6 +51,10 @@ namespace StudentManagementSystem.API.Models
                 .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<Grade>()
+                .HasIndex(g => new { g.StudentId, g.CourseId })
+                .IsUnique();
+
+            modelBuilder.Entity<Grade>()
                 .HasOne(g => g.Student)
                 .WithMany(s => s.Grades)
                 .HasForeignKey(g => g.StudentId)
@@ -61,6 +65,10 @@ namespace StudentManagementSystem.API.Models
                 .WithMany(c => c.Grades)
                 .HasForeignKey(g => g.CourseId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Attendance>()
+                .HasIndex(a => new { a.StudentId, a.CourseId, a.Date })
+                .IsUnique();
 
             modelBuilder.Entity<Attendance>()
                 .HasOne(a => a.Student)

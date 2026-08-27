@@ -33,7 +33,7 @@ namespace StudentManagementSystem.API
             builder.Services.AddOptions<JwtOptions>()
                 .Bind(builder.Configuration.GetSection(JwtOptions.SectionName))
                 .Validate(o => !string.IsNullOrWhiteSpace(o.Key) && o.Key.Length >= 32,
-                    "Jwt:Key must be at least 32 characters.")
+                    "Jwt:Key must be at least 32 characters. Set it via the Jwt__Key environment variable (or user-secrets) - never commit a real signing key.")
                 .ValidateDataAnnotations();
 
             builder.Services.AddDbContext<AppDbContext>(option =>
@@ -62,6 +62,9 @@ namespace StudentManagementSystem.API
             // Add JWT authentication.
             var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
                 ?? throw new InvalidOperationException("Jwt configuration is missing.");
+            if (string.IsNullOrWhiteSpace(jwtOptions.Key))
+                throw new InvalidOperationException(
+                    "Jwt:Key is not configured. Set the Jwt__Key environment variable (or user-secrets) with a key of at least 32 characters.");
             var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Key));
 
             builder.Services.AddAuthentication(options =>
@@ -159,6 +162,8 @@ namespace StudentManagementSystem.API
 
             using (var scope = app.Services.CreateScope())
             {
+                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                await db.Database.MigrateAsync();
                 await DbSeeder.SeedAsync(scope.ServiceProvider, app.Environment);
             }
 

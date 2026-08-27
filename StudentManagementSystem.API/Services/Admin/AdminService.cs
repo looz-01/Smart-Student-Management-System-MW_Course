@@ -77,21 +77,55 @@ namespace StudentManagementSystem.API.Services.Admin
             var user = await _userManager.FindByIdAsync(dto.UserId);
             if (user == null) return false;
 
-            if (!await _roleManager.RoleExistsAsync(dto.NewRole)) return false;
+            // Normalize to canonical role names so "admin"/"ADMIN" map to "Admin".
+            var newRole = NormalizeRole(dto.NewRole);
+            if (newRole == null || !await _roleManager.RoleExistsAsync(newRole)) return false;
 
             var currentRoles = await _userManager.GetRolesAsync(user);
+
+            // Prevent locking the system out: the last Admin must not be demoted.
+            if (currentRoles.Contains(DbSeeder.RoleAdmin) && newRole != DbSeeder.RoleAdmin)
+            {
+                var adminCount = await _userManager.GetUsersInRoleAsync(DbSeeder.RoleAdmin);
+                if (adminCount.Count <= 1)
+                    return false;
+            }
+
             if (currentRoles.Any())
                 await _userManager.RemoveFromRolesAsync(user, currentRoles);
 
-            var result = await _userManager.AddToRoleAsync(user, dto.NewRole);
+            var result = await _userManager.AddToRoleAsync(user, newRole);
             if (!result.Succeeded) return false;
 
-            await SyncProfileAsync(user, dto.NewRole);
+            await SyncProfileAsync(user, newRole);
             return true;
         }
 
         private async Task SyncProfileAsync(AppUser user, string role)
         {
+            // Remove the profile of the previous role so a user can never exist in both tables.
+            var oldStudent = await _db.Students.FirstOrDefaultAsync(s => s.UserId == user.Id);
+            if (role != DbSeeder.RoleStudent && oldStudent != null)
+            {
+                _db.Grades.RemoveRange(_db.Grades.Where(g => g.StudentId == oldStudent.Id));
+                _db.Attendances.RemoveRange(_db.Attendances.Where(a => a.StudentId == oldStudent.Id));
+                _db.Enrollments.RemoveRange(_db.Enrollments.Where(e => e.StudentId == oldStudent.Id));
+                _db.Students.Remove(oldStudent);
+            }
+
+            var oldTeacher = await _db.Teachers.FirstOrDefaultAsync(t => t.UserId == user.Id);
+            if (role != DbSeeder.RoleTeacher && oldTeacher != null)
+            {
+                var teacherCourseIds = _db.Courses.Where(c => c.TeacherId == oldTeacher.Id).Select(c => c.Id);
+                _db.Grades.RemoveRange(_db.Grades.Where(g => teacherCourseIds.Contains(g.CourseId)));
+                _db.Attendances.RemoveRange(_db.Attendances.Where(a => teacherCourseIds.Contains(a.CourseId)));
+                _db.Enrollments.RemoveRange(_db.Enrollments.Where(e => teacherCourseIds.Contains(e.CourseId)));
+                _db.Courses.RemoveRange(_db.Courses.Where(c => c.TeacherId == oldTeacher.Id));
+                _db.Teachers.Remove(oldTeacher);
+            }
+
+            await _db.SaveChangesAsync();
+
             if (role == DbSeeder.RoleStudent &&
                 !await _db.Students.AnyAsync(s => s.UserId == user.Id))
             {
@@ -118,6 +152,14 @@ namespace StudentManagementSystem.API.Services.Admin
                 });
                 await _db.SaveChangesAsync();
             }
+        }
+
+        private static string? NormalizeRole(string role)
+        {
+            if (role.Equals(DbSeeder.RoleAdmin, StringComparison.OrdinalIgnoreCase)) return DbSeeder.RoleAdmin;
+            if (role.Equals(DbSeeder.RoleStudent, StringComparison.OrdinalIgnoreCase)) return DbSeeder.RoleStudent;
+            if (role.Equals(DbSeeder.RoleTeacher, StringComparison.OrdinalIgnoreCase)) return DbSeeder.RoleTeacher;
+            return null;
         }
     }
 }
