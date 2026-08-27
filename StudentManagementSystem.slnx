@@ -1,5 +1,5 @@
 ﻿<Solution>
   <Project Path="StudentManagementSystem.DTOs/StudentManagementSystem.DTOs.csproj" Id="eba4701c-4fc6-4ef9-b794-e7687a7be9db" />
-  <Project Path="StudentManagementSystem.API/StudentManagementSystem.API.csproj" />
+  <Project Path="StudentManagementSystem.API/StudentManagementSystem.API.csproj" Id="58134e03-1f5a-4493-a265-18c71310de9e" />
   <Project Path="StudentManagementSystem.API.Tests/StudentManagementSystem.API.Tests.csproj" Id="87089cbb-7196-4056-a56f-540778ce8e84" />
 </Solution>

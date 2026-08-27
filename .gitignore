@@ -17,3 +17,6 @@ logs/
 
 # Uploaded files
 wwwroot/uploads/
+
+# Legacy solution file recreated by stale IDE state
+/StudentMangmentSystem.slnx
